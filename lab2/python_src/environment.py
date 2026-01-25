@@ -52,7 +52,7 @@ class State:
       self.current_orientation,
       self.current_x,
       self.current_y,
-      self.dirts
+      tuple(self.dirts)
     ))
 
   def __eq__(self, o):
