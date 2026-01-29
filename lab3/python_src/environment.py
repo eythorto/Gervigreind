@@ -146,5 +146,9 @@ class Environment:
 
   def is_goal_state(self, state):
     return len(state.dirts)==0 and not state.turned_on
+  
+  def __lt__(self, other):
+      # Used to help compare in search.
+      return False
 
 ##############

@@ -1,4 +1,5 @@
 import collections
+import heapq
 
 ######################
 
@@ -92,15 +93,57 @@ class AStarSearch(SearchAlgorithm):
 		self.nb_node_expansions = 0
 		self.max_frontier_size = 0
 		self.goal_node = None
+		self.goal_length = None
 
-		# TODO implement the search here
+		# TODO: implement the search here
 		# Update nb_node_expansions and max_frontier_size while doing the search:
 		# - nb_node_expansions should be incremented by one for each node popped from the frontier
 		# - max_frontier_size should be the largest size of the frontier observed during the search measured in number of nodes
 		# Once a goal node has been found, set the goal_node variable to it, this should take care of get_plan() and get_plan_cost() below,
 		# as long as the node contains the right information.
 
-		return
+		# Using heapq which uses a min heap to keep track of smallest cost.
+
+		counter = 0
+		frontier = [(0, -1, Node(0, None, env.get_current_state(), None))]
+		seen_states = set()
+		
+		while True:
+			length = len(frontier)
+			if (length == 0):
+				return
+			if (length > self.max_frontier_size):
+				self.max_frontier_size = length
+			length, _, current_node = heapq.heappop(frontier)
+			# TODO: add node to found list, hash set.
+			if current_node.state in seen_states:
+				continue
+			seen_states.add(current_node.state)
+			
+			self.nb_node_expansions += 1
+
+			if self.goal_length != None and length >= self.goal_length:
+				return
+
+			if env.is_goal_state(current_node.state):
+				if (self.goal_length == None or self.goal_length > current_node.value):
+					self.goal_node = current_node
+					self.goal_length = current_node.value
+			
+			legal_actions = env.get_legal_actions(current_node.state)
+			for legal_action in legal_actions:
+				s = env.get_next_state(current_node.state, legal_action)
+				cost_of_action = env.get_cost(current_node.state, legal_action)
+				counter += 1
+				cost = current_node.value + cost_of_action + self.heuristics.eval(s) # f(n) = g(n) + h(n)
+
+				# TODO: Check if node is in hash set.
+				if s not in seen_states:
+					heapq.heappush(frontier, (cost, counter, Node(current_node.value + cost_of_action, current_node, s, legal_action)))
+				# TODO: Check if node is in frontier
+
+	
+
 
 	def get_plan(self):
 		if not self.goal_node:

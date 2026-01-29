@@ -40,7 +40,7 @@ class GGPRequestHandler(BaseHTTPRequestHandler):
     self.send_header('Content-type', 'text/acl')
     self.end_headers()
     self.wfile.write(message.encode())
-    print("sending: " + str(code) + " - " + message)
+    #print("sending: " + str(code) + " - " + message)
 
   def do_GET(self):
   	self.respond(400, "Only POST requests are supported!")
@@ -52,8 +52,8 @@ class GGPRequestHandler(BaseHTTPRequestHandler):
     # Reads post request body
     content_len = int(self.headers['Content-Length'])
     msg = self.rfile.read(content_len).decode()
-    print("----------------")
-    print("received: " + msg)
+    #print("----------------")
+    #print("received: " + msg)
     try:
       cmd = self.get_command(msg)
       if cmd == "START":
