@@ -82,7 +82,10 @@ class VacuumCleanerAgent(Agent):
 
   def next_action(self, percepts):
     # execute actions from the plan one after the other
+    if not self.plan:
+      return "NOOP"
+    
     a = self.plan.pop(0)
-    print("executing " + a)
+    #print("executing " + a)
     return a
 

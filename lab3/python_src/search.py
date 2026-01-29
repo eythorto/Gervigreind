@@ -1,5 +1,6 @@
 import collections
 import heapq
+import time
 
 ######################
 
@@ -84,6 +85,8 @@ class AStarSearch(SearchAlgorithm):
 	nb_node_expansions = 0
 	max_frontier_size = 0
 	goal_node = None
+	runtime = 0
+	TIMEOUT_SECONDS = 1800  # 15 minutes
 
 	def __init__(self, heuristic):
 		super().__init__(heuristic)
@@ -94,6 +97,8 @@ class AStarSearch(SearchAlgorithm):
 		self.max_frontier_size = 0
 		self.goal_node = None
 		self.goal_length = None
+		self.runtime = 0
+		start_time = time.time()
 
 		# TODO: implement the search here
 		# Update nb_node_expansions and max_frontier_size while doing the search:
@@ -109,11 +114,20 @@ class AStarSearch(SearchAlgorithm):
 		seen_states = set()
 		
 		while True:
-			length = len(frontier)
-			if (length == 0):
+			# Check for timeout
+			elapsed_time = time.time() - start_time
+			if elapsed_time > self.TIMEOUT_SECONDS:
+				self.runtime = elapsed_time
+				length, _, current_node = heapq.heappop(frontier)
+				print(f"Search timed out after {elapsed_time:.2f} seconds (30 minutes limit), currently on a node with cost {length}")
 				return
-			if (length > self.max_frontier_size):
-				self.max_frontier_size = length
+			
+			frontier_length = len(frontier)
+			if (frontier_length == 0):
+				self.runtime = time.time() - start_time
+				return
+			if (frontier_length > self.max_frontier_size):
+				self.max_frontier_size = frontier_length
 			length, _, current_node = heapq.heappop(frontier)
 			# TODO: add node to found list, hash set.
 			if current_node.state in seen_states:
@@ -123,6 +137,7 @@ class AStarSearch(SearchAlgorithm):
 			self.nb_node_expansions += 1
 
 			if self.goal_length != None and length >= self.goal_length:
+				self.runtime = time.time() - start_time
 				return
 
 			if env.is_goal_state(current_node.state):
