@@ -1,4 +1,5 @@
 import java.util.List;
+import java.util.PriorityQueue;
 
 public class AStarSearch implements SearchAlgorithm {
 
@@ -8,6 +9,9 @@ public class AStarSearch implements SearchAlgorithm {
 	private Heuristics heuristics;
 
 	private Node goalNode;
+	private long runtime;
+	
+	private static final long TIMEOUT_MILLIS = 900000; // 15 minutes
 
 	public AStarSearch(Heuristics h) {
 		this.heuristics = h;
@@ -19,14 +23,59 @@ public class AStarSearch implements SearchAlgorithm {
 		nbNodeExpansions = 0;
 		maxFrontierSize = 0;
 		goalNode = null;
+		runtime = 0;
+		long startTime = System.currentTimeMillis();
 
-		// TODO implement the search here
-		// Update nbNodeExpansions and maxFrontierSize while doing the search:
-		// - nbNodeExpansions should be incremented by one for each node popped from the frontier
-		// - maxFrontierSize should be the largest size of the frontier observed during the search measured in number of nodes
-		// Once a goal node has been found, set the goalNode variable to it, this should take care of getPlan() and getPlanCost() below,
-		// as long as the node contains the right information.
-
+		// Priority queue for the frontier (min-heap based on node evaluation)
+		PriorityQueue<Node> frontier = new PriorityQueue<>();
+		
+		// Create initial node
+		State initialState = env.getCurrentState();
+		int initialHeuristic = heuristics.eval(initialState);
+		Node initialNode = new Node(initialState, initialHeuristic);
+		
+		frontier.add(initialNode);
+		
+		while (!frontier.isEmpty()) {
+			// Check for timeout
+			long elapsedTime = System.currentTimeMillis() - startTime;
+			if (elapsedTime > TIMEOUT_MILLIS) {
+				runtime = elapsedTime;
+				System.out.println("Search timed out after " + (elapsedTime / 1000.0) + " seconds (15 minutes limit)");
+				return;
+			}
+			
+			// Track max frontier size
+			if (frontier.size() > maxFrontierSize) {
+				maxFrontierSize = frontier.size();
+			}
+			
+			// Pop node with lowest f(n) = g(n) + h(n)
+			Node currentNode = frontier.poll();
+			nbNodeExpansions++;
+			
+			// Check if goal state
+			if (env.isGoalState(currentNode.state)) {
+				goalNode = currentNode;
+				runtime = System.currentTimeMillis() - startTime;
+				return;
+			}
+			
+			// Expand node - generate successors
+			List<Action> legalActions = env.legalMoves(currentNode.state);
+			for (Action action : legalActions) {
+				State nextState = env.getNextState(currentNode.state, action);
+				int costToNext = env.getCost(currentNode.state, action);
+				int gValue = currentNode.evaluation - heuristics.eval(currentNode.state) + costToNext;
+				int hValue = heuristics.eval(nextState);
+				int fValue = gValue + hValue;
+				
+				Node childNode = new Node(currentNode, nextState, action, fValue);
+				frontier.add(childNode);
+			}
+		}
+		
+		runtime = System.currentTimeMillis() - startTime;
 	}
 
 	@Override
@@ -49,6 +98,10 @@ public class AStarSearch implements SearchAlgorithm {
 	public int getPlanCost() {
 		if (goalNode != null) return goalNode.evaluation;
 		else return 0;
+	}
+	
+	public long getRuntime() {
+		return runtime;
 	}
 
 }

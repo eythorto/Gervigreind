@@ -86,7 +86,7 @@ class AStarSearch(SearchAlgorithm):
 	max_frontier_size = 0
 	goal_node = None
 	runtime = 0
-	TIMEOUT_SECONDS = 1800  # 15 minutes
+	TIMEOUT_SECONDS = 300  # 5 minutes
 
 	def __init__(self, heuristic):
 		super().__init__(heuristic)
@@ -119,7 +119,7 @@ class AStarSearch(SearchAlgorithm):
 			if elapsed_time > self.TIMEOUT_SECONDS:
 				self.runtime = elapsed_time
 				length, _, current_node = heapq.heappop(frontier)
-				print(f"Search timed out after {elapsed_time:.2f} seconds (30 minutes limit), currently on a node with cost {length}")
+				print(f"Search timed out after {elapsed_time:.2f} seconds (5 minutes limit), currently on a node with cost {length}")
 				return
 			
 			frontier_length = len(frontier)
@@ -129,7 +129,8 @@ class AStarSearch(SearchAlgorithm):
 			if (frontier_length > self.max_frontier_size):
 				self.max_frontier_size = frontier_length
 			length, _, current_node = heapq.heappop(frontier)
-			# TODO: add node to found list, hash set.
+
+			# add node to hash set if not seen, if seen, skip this run.
 			if current_node.state in seen_states:
 				continue
 			seen_states.add(current_node.state)
@@ -152,10 +153,9 @@ class AStarSearch(SearchAlgorithm):
 				counter += 1
 				cost = current_node.value + cost_of_action + self.heuristics.eval(s) # f(n) = g(n) + h(n)
 
-				# TODO: Check if node is in hash set.
+				# Check if node is in hash set.
 				if s not in seen_states:
 					heapq.heappush(frontier, (cost, counter, Node(current_node.value + cost_of_action, current_node, s, legal_action)))
-				# TODO: Check if node is in frontier
 
 	
 
