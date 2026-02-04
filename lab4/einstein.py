@@ -94,20 +94,57 @@ def setup_csp():
     variables.append(Milk)
 
     # The Englishman lives in the red house.
+    model.Add(Englishman == Red)
+
     # The Spaniard owns the dog.
+    model.Add(Spaniard == Dog)
+
     # Coffee is drunk in the green house.
+    model.Add(Coffee == Green)
+
     # The Ukrainian drinks tea.
+    model.Add(Ukrainian == Tea)
+
     # The green house is immediately to the right of the ivory house.
+    model.Add(Green == Ivory + 1)
+
     # The Old Gold smoker owns snails.
+    model.Add(Old_Gold == Snails)
+
     # Kools are smoked in the yellow house.
+    model.Add(Kools == Yellow)
+
     # Milk is drunk in the middle house.
+    model.Add(Milk == 3)
+
     # The Norwegian lives in the first house.
+    model.Add(Norwegian == 1)
+
     # The man who smokes Chesterfields lives in the house next to the man with the fox.
+    model.AddAbsEquality(
+        1, Chesterfields - Fox
+    )  # Chesterfields can either be on the right/left to the fox house
+
     # Kools are smoked in the house next to the house where the horse is kept.
+    model.AddAbsEquality(
+        1, Kools - Horse
+    )  # Kools can either be on the right/left to the horse house
+
     # The Lucky Strike smoker drinks orange juice.
+    model.Add(Lucky_Strike == Orange_juice)
+
     # The Japanese smokes Parliaments.
+    model.Add(Japanese == Parliaments)
+
     # The Norwegian lives next to the blue house.
+    model.AddAbsEquality(1, Norwegian - Blue)
+
     # Each of the five houses has a different color, each of the five inhabitants has a different nationality, prefers a different brand of cigarettes, a different drink, and owns a different pet.
+    model.AddAllDifferent([Red, Green, Ivory, Yellow, Blue])
+    model.AddAllDifferent([Englishman, Spaniard, Norwegian, Ukrainian, Japanese])
+    model.AddAllDifferent([Old_Gold, Kools, Chesterfields, Lucky_Strike, Parliaments])
+    model.AddAllDifferent([Water, Orange_juice, Tea, Coffee, Milk])
+    model.AddAllDifferent([Zebra, Dog, Fox, Snails, Horse])
 
     return model, variables
 
