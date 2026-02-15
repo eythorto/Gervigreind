@@ -1,8 +1,11 @@
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+
 
 public class SearchAgent implements Agent
 {
+	Random rand = new Random();
 	private Random random = new Random();
 
 	private String role; // the name of this agent's role (white or black)
@@ -10,14 +13,7 @@ public class SearchAgent implements Agent
 	private boolean myTurn; // whether it is this agent's turn or not
 	private int width, height; // dimensions of the board
 
-    private enum Square {
-        EMPTY,
-        BLOCKED,
-        BLACK,
-        WHITE
-    }
-
-    private Square[][] board;
+    private Environment env;
 	
 	/*
 		init(String role, int playclock) is called once before you have to select the first action. Use it to initialize the agent. role is either "white" or "black" and playclock is the number of seconds after which nextAction must return.
@@ -32,23 +28,14 @@ public class SearchAgent implements Agent
 		this.width = width;
 		this.height = height;
 		// TODO: add your own initialization code here
-        this.board = new Square[width][height];
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
-                board[i][j] = Square.EMPTY;
-            }
-        }
-        for (int[] pos : white_positions) {
-            board[pos[0]][pos[1]] = Square.WHITE;
-        }
-        for (int[] pos : black_positions) {
-            board[pos[0]][pos[1]] = Square.BLACK;
-        }
+        env = new Environment(role, width, height, white_positions, black_positions);
     }
 
 	// lastMove is null the first time nextAction gets called (in the initial state)
     // otherwise it contains the coordinates x1,y1,x2,y2 of the move that the last player did
     public String nextAction(int[] lastMove) {
+		// TODO: time limit
+		// TODO: return "NOOP" if not your players turn
     	if (lastMove != null) {
     		int x1 = lastMove[0], y1 = lastMove[1], x2 = lastMove[2], y2 = lastMove[3];
     		String roleOfLastPlayer;
@@ -59,7 +46,7 @@ public class SearchAgent implements Agent
     		}
    			System.out.println(roleOfLastPlayer + " moved from " + x1 + "," + y1 + " to " + x2 + "," + y2);
     		// TODO: 1. update your internal world model according to the action that was just executed
-    		
+			env.doMove(new Environment.Move(x1-1, y1-1, x2-1, y2-1));
     	}
 		
     	// update turn (above that line it myTurn is still for the previous state)
@@ -69,12 +56,13 @@ public class SearchAgent implements Agent
 
 			// Here we just construct a random move (that will most likely not even be possible),
 			// this needs to be replaced with the actual best move.
-			int x1,y1,x2,y2;
-			x1 = random.nextInt(width)+1;
-			y1 = random.nextInt(height)+1;
-			x2 = random.nextInt(width)+1;
-			y2 = random.nextInt(height)+1;
-			return "(play " + x1 + " " + y1 + " " + x2 + " " + y2 + ")";
+
+			List<Environment.Move> moves = env.legalMoves(env.current_state);
+						
+			int randint = rand.nextInt(moves.size());
+			Environment.Move randomMove = moves.get(randint);
+			env.doMove(randomMove);
+			return "(play " + (randomMove.fromX + 1) + " " + (randomMove.fromY + 1) + " " + (randomMove.toX + 1) + " " + (randomMove.toY + 1) + ")";
 		} else {
 			return "noop";
 		}
@@ -84,6 +72,9 @@ public class SearchAgent implements Agent
 	@Override
 	public void cleanup() {
 		// TODO: cleanup so that the agent is ready for the next match
+		// garbage collector in java - check it out
+		// env = null; - clear environment
+		// table.clear(); when we have transposition tables
 	}
 
 }
