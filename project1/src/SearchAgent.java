@@ -68,6 +68,38 @@ public class SearchAgent implements Agent
 		}
 	}
 
+	// MINMAX UPPKAST ##########################################
+	// TODO: Add pruning and changable depth + timestamp stuff
+	// for now try implementing this without pruning and with a fixed depth - to test
+
+	// public String minmax(state, player_turn, depth, alpha, beta){
+	// 	if (status.is_terminal or depth == 0){
+	// 		return evaluation_function(status, player_turn);
+	// 	}
+	// 	else{
+	// 		best_value = -infinite; // for MAX
+	// 		for (alpha in legal_moves(state)){
+	// 			successor_state = next_state(state, action);
+	// 			value = -minmax(successor_state, negation_of_current_player, d - 1);
+	// 			print(depth, action, value) // for debugging, take this out later when we have larger spaces - maybe alpha and beta too?
+	// 			if (value > best_value){
+	// 				best_value = value;
+	// 				// for pruning
+	// 				// if alpha >= beta break the loop - 
+	// 				best_move = action;
+	// 			}
+	// 		}
+	// 	}
+	// 	return best_value;
+	// }
+
+	// public minmaxRoot(state, player_turn){
+	// 	// exactly the same as in the minmax function except
+	// 	// best_move = mil ?? instead of best_value in minmax code
+	// 	// returns the best move
+	// }
+	// ##########################################################3
+
 	// is called when the game is over or the match is aborted
 	@Override
 	public void cleanup() {
