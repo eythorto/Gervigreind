@@ -61,7 +61,7 @@ public class SearchAgent implements Agent
 						
 			int randint = rand.nextInt(moves.size());
 			Environment.Move randomMove = moves.get(randint);
-			env.doMove(randomMove);
+			env.doMove(randomMove); // FIXME: REMOVE THIS - otherwise you call it twice when it is your turn and end up in the wrong state. 
 			return "(play " + (randomMove.fromX + 1) + " " + (randomMove.fromY + 1) + " " + (randomMove.toX + 1) + " " + (randomMove.toY + 1) + ")";
 		} else {
 			return "noop";

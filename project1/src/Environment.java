@@ -257,11 +257,18 @@ public class Environment {
         }
     }
     
+
+    // TODO: missing is_terminal state
+
+    // FIXME: incorrect
+    // "You only win if the opponent has no legal moves, but you do have at least one left."
     // Opponent player has no legal moves left 
     public boolean isWin(State state){
         return legalMoves(state).isEmpty();
     }
 
+    // FIXME: incorrect
+    // "The game ends in a draw if either - both players are out of legal moves, or both player do have legal moves left."
     //if there are only W empty squares left on the board.
     public boolean isDraw(State state) {
         int empty_tiles = 0;
