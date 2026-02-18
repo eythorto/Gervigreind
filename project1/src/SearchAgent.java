@@ -12,6 +12,7 @@ public class SearchAgent implements Agent
 	private int playclock; // this is how much time (in seconds) we have before nextAction needs to return a move
 	private boolean myTurn; // whether it is this agent's turn or not
 	private int width, height; // dimensions of the board
+	private long startTime; // Track when move calculation started
 
     private Environment env;
 	
@@ -28,7 +29,8 @@ public class SearchAgent implements Agent
 		this.width = width;
 		this.height = height;
 		// TODO: add your own initialization code here
-        env = new Environment(role, width, height, white_positions, black_positions);
+		// Game always starts with white to move, regardless of which agent this is
+        env = new Environment(State.Role.WHITE,width, height, white_positions, black_positions);
     }
 
 	// lastMove is null the first time nextAction gets called (in the initial state)
@@ -57,47 +59,108 @@ public class SearchAgent implements Agent
 			// Here we just construct a random move (that will most likely not even be possible),
 			// this needs to be replaced with the actual best move.
 
-			List<Environment.Move> moves = env.legalMoves(env.current_state);
+			// List<Environment.Move> moves = env.legalMoves(env.current_state);
+			// System.out.println("Color to move: " + env.current_state.role);
+			// for (Environment.Move m : moves) {
+			// 	System.out.println("Legal move: " + (m.fromX + 1) + "," + (m.fromY + 1) + " to " + (m.toX + 1) + "," + (m.toY + 1));
+			// }
 						
-			int randint = rand.nextInt(moves.size());
-			Environment.Move randomMove = moves.get(randint);
-			env.doMove(randomMove); // FIXME: REMOVE THIS - otherwise you call it twice when it is your turn and end up in the wrong state. 
-			return "(play " + (randomMove.fromX + 1) + " " + (randomMove.fromY + 1) + " " + (randomMove.toX + 1) + " " + (randomMove.toY + 1) + ")";
+		// Use minimax search to find the best move
+		startTime = System.currentTimeMillis(); // Start timing
+		
+		State.Square[][] copy = new State.Square[this.width][this.height];
+		for (int i = 0; i < this.width; i++) {
+			for (int j = 0; j < this.height; j++) {
+				copy[i][j] = env.current_state.board[i][j];
+			}
+		}
+		State.Role current_player = env.current_state.role == State.Role.WHITE ? State.Role.WHITE : State.Role.BLACK;
+		State state_copy = new State(copy, current_player); // make a copy of the current state to run the search on, so we don't mess with our actual state
+		int depth = 1;
+		Environment.Move bestMove = null;
+		try{
+			while (depth <= (this.width * this.height)) {  // iterative deepening
+				bestMove = minimaxRoot(state_copy, depth, -100, 100);
+				depth++;
+			}
+		}
+		catch (Exception e) {}
+		return "(play " + (bestMove.fromX + 1) + " " + (bestMove.fromY + 1) + " " + (bestMove.toX + 1) + " " + (bestMove.toY + 1) + ")";
 		} else {
 			return "noop";
 		}
 	}
 
-	// MINMAX UPPKAST ##########################################
+	public Environment.Move minimaxRoot(State state, int depth, int alpha, int beta) throws Exception {
+		// the search should start in the root - its possible to prune from the root node
+		// if timeIsUp throw Exception() -> don't return anything! Stop the time a few seconds earlier than we need, so we don't run out of time
+		long elapsedTime = (System.currentTimeMillis() - startTime) / 1000; // Convert to seconds
+		if (elapsedTime >= playclock - 2) // Leave 2 second buffer
+			throw new Exception("Time is up!"); 
+		int best_value = -101;  // Start with worst possible value
+		Environment.Move best_move = null;
+		List<Environment.Move> moves = env.legalMoves(state);
+		for (Environment.Move m : moves) {
+			env.doMoveForState(state, m);
+			int value = -minimax(state, depth - 1, -beta, -alpha);
+			//System.out.println("Depth: " + depth + " Move: " + m + " Value: " + value + " Alpha: " + alpha + " Beta: " + beta); // for debugging, take this out later when we have larger spaces 
+			if (value > best_value){
+				best_value = value;
+				best_move = m;
+				// for pruning
+				if (best_value > alpha) {
+					alpha = best_value;
+					if (alpha >= beta) {
+						env.undoMoveForState(state, m);
+						break;
+					}
+				}
+			}
+			env.undoMoveForState(state, m);
+		}
+		return best_move;
+	}
+
+	public int minimax(State state, int depth, int alpha, int beta) throws Exception {
+		long elapsedTime = (System.currentTimeMillis() - startTime) / 1000; // Convert to seconds
+		if (elapsedTime >= playclock - 2) // Leave 2 second buffer
+			throw new Exception("Time is up!"); // for time limit, catch this in the minimaxRoot and return the best move found so far
+		if (env.isTerminal(state) || depth <= 0){ //depth limit == 0, reached end of depth
+			return env.evaluationFunction(state);
+		}
+		else{
+			int best_value = -101;
+			List<Environment.Move> moves = env.legalMoves(state);
+			for (Environment.Move m : moves) {
+				env.doMoveForState(state, m);
+				int value = -minimax(state, depth - 1, -beta, -alpha);
+				//System.out.println("Depth: " + depth + " Move: " + m + " Value: " + value + " Alpha: " + alpha + " Beta: " + beta); // for debugging, take this out later when we have larger spaces 
+				if (value > best_value){
+					best_value = value;
+					// for pruning
+					// if alpha >= beta break the loop - 
+					if (best_value > alpha) {
+						alpha = best_value;
+						if (alpha >= beta) {
+							env.undoMoveForState(state, m);
+							break;
+						}
+					}
+				}
+				env.undoMoveForState(state, m);
+			}
+			return best_value;
+		}
+	}
+
+
 	// TODO: Add pruning and changable depth + timestamp stuff
-	// for now try implementing this without pruning and with a fixed depth - to test
+	// for now try implementing this without pruning and without iterative depth - to test
+	// if search is suspiciously fast - check if pruning is right, draw it out on paper and compare
+	// try to minimize running the legal_moves function, since that takes the longest time
 
-	// public String minmax(state, player_turn, depth, alpha, beta){
-	// 	if (status.is_terminal or depth == 0){
-	// 		return evaluation_function(status, player_turn);
-	// 	}
-	// 	else{
-	// 		best_value = -infinite; // for MAX
-	// 		for (alpha in legal_moves(state)){
-	// 			successor_state = next_state(state, action);
-	// 			value = -minmax(successor_state, negation_of_current_player, d - 1);
-	// 			print(depth, action, value) // for debugging, take this out later when we have larger spaces - maybe alpha and beta too?
-	// 			if (value > best_value){
-	// 				best_value = value;
-	// 				// for pruning
-	// 				// if alpha >= beta break the loop - 
-	// 				best_move = action;
-	// 			}
-	// 		}
-	// 	}
-	// 	return best_value;
-	// }
 
-	// public minmaxRoot(state, player_turn){
-	// 	// exactly the same as in the minmax function except
-	// 	// best_move = mil ?? instead of best_value in minmax code
-	// 	// returns the best move
-	// }
+
 	// ##########################################################3
 
 	// is called when the game is over or the match is aborted

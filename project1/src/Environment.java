@@ -5,6 +5,7 @@ public class Environment {
 
     public static class Move {
         // action -> move a queen fromX, fromY, toX, toY
+        // FIXME: could do it int is x_1 + (y_1 << 8) + (x_2 << 16) + (y_2 << 24) instead, faster
         int fromX, fromY;
         int toX, toY;
         public Move(int fromX, int fromY, int toX, int toY) {
@@ -19,7 +20,7 @@ public class Environment {
     int height;
     State current_state;
     
-    public Environment(String role, int width, int height, int[][] white_positions, int[][] black_positions) {
+    public Environment(State.Role role, int width, int height, int[][] white_positions, int[][] black_positions) {
         this.width = width;
         this.height = height;
         State.Square[][] board = new State.Square[width][height];
@@ -41,7 +42,7 @@ public class Environment {
         // returns a list of possible actions
         // TODO: Returns 0 based x and y values now, fix to return +1s on both x and y
         State.Square color;
-        if (state.role.equals("white")) {
+        if (state.role == State.Role.WHITE) {
             color = State.Square.WHITE;
         }
         else {
@@ -165,6 +166,35 @@ public class Environment {
         current_state = getNextState(current_state, m);
     }
 
+    public void doMoveForState(State s, Move m) {
+        State.Square square;
+        if (s.role == State.Role.BLACK) {
+            s.role = State.Role.WHITE;
+            square = State.Square.BLACK;
+        }
+        else {
+            s.role = State.Role.BLACK;
+            square = State.Square.WHITE;
+        }
+
+        s.board[m.fromX][m.fromY] = State.Square.BLOCKED;
+        s.board[m.toX][m.toY] = square;
+    }
+
+    public void undoMoveForState(State s, Move m){
+        State.Square square;
+        if (s.role == State.Role.BLACK) {
+            s.role = State.Role.WHITE;
+            square = State.Square.WHITE;
+        }
+        else {
+            s.role = State.Role.BLACK;
+            square = State.Square.BLACK;
+        }
+        s.board[m.toX][m.toY] = State.Square.EMPTY;
+        s.board[m.fromX][m.fromY] = square;
+    }
+
     public State getNextState(State s, Move m) {
         State.Square[][] copy = new State.Square[this.width][this.height];
 
@@ -173,15 +203,15 @@ public class Environment {
                 copy[i][j] = s.board[i][j];
             }
         }
-        String role;
+        State.Role role;
         State.Square square;
-        if (s.role.equals("white")) {
-            role = "black";
-            square = State.Square.WHITE;
+        if (s.role == State.Role.BLACK) {
+            role = State.Role.WHITE;
+            square = State.Square.BLACK;
         }
         else {
-            role = "white";
-            square = State.Square.BLACK;
+            role = State.Role.BLACK;
+            square = State.Square.WHITE;
         }
 
         copy[m.fromX][m.fromY] = State.Square.BLOCKED;
@@ -232,57 +262,63 @@ public class Environment {
                 }
             }
         }
-        // IF DRAW, We return zero.
-        if (empty_squares <= this.width) {
-            return 0;
-        }
-        // IF ONE WINS, We return 100 / -100, else we return <nb. of moveable your queens> - <nb. of moveable enemy queens>
-        if (state.role == "black") {
-            if (moveable_black == 0) {
+        // Return value from current player's perspective: positive = good for current player, negative = bad
+        // Current player to move is state.role
+        if (state.role == State.Role.BLACK) {
+            // It's BLACK's turn
+            if (moveable_black == 0 && moveable_white > 0) {
+                return -100;
+            }
+            else if (moveable_white == 0 && moveable_black > 0) {
                 return 100;
             }
-            else if (moveable_white == 0) {
-                return -100;
+            else if (moveable_black == 0 && moveable_white == 0) {
+                return 0;
             }
             return moveable_black - moveable_white;
         }
         else {
-            if (moveable_black == 0) {
+            // It's WHITE's turn
+            if (moveable_white == 0 && moveable_black > 0) {
                 return -100;
             }
-            else if (moveable_white == 0) {
+            else if (moveable_black == 0 && moveable_white > 0) {
                 return 100;
+            }
+            else if (moveable_black == 0 && moveable_white == 0) {
+                return 0;
             }
             return moveable_white - moveable_black;
         }
-    }
-    
-
-    // TODO: missing is_terminal state
-
-    // FIXME: incorrect
-    // "You only win if the opponent has no legal moves, but you do have at least one left."
-    // Opponent player has no legal moves left 
-    public boolean isWin(State state){
-        return legalMoves(state).isEmpty();
+        
     }
 
-    // FIXME: incorrect
-    // "The game ends in a draw if either - both players are out of legal moves, or both player do have legal moves left."
-    //if there are only W empty squares left on the board.
-    public boolean isDraw(State state) {
-        int empty_tiles = 0;
-        for (int x = 1; x <= this.width; x++) {
-            for (int y = 1; y <= this.height; y++) {
-                if (state.board[x][y] == State.Square.EMPTY) {
-                    empty_tiles++;
-                    if (empty_tiles > this.width) {
-                        return false;
-                    }
-                }
+    public boolean isTerminal(State state){        
+        // legal moves for current player
+        List<Environment.Move> currentPlayerMoves = legalMoves(state);
+
+        // legal moves for opponent player
+        State.Role opponentRole = (state.role == State.Role.BLACK) ? State.Role.WHITE : State.Role.BLACK;
+        State opponentState = new State(state.board, opponentRole);
+        List<Environment.Move> opponentPlayerMoves = legalMoves(opponentState);
+
+        int emptySquares = 0;
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (state.board[x][y] == State.Square.EMPTY)
+                    emptySquares++;
             }
         }
-        return true;
+
+        // if either player cannot move
+        if (currentPlayerMoves.isEmpty() && opponentPlayerMoves.isEmpty()){
+            return true; // terminate the state 
+        }
+        // 2) If only W empty squares left → game ends
+        if (emptySquares <= width)
+            return true;
+            
+        return false; // not terminate
     }
 
 }
