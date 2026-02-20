@@ -293,29 +293,48 @@ public class Environment {
         
     }
 
-    public boolean isTerminal(State state){        
-        // legal moves for current player
-        List<Environment.Move> currentPlayerMoves = legalMoves(state);
+    public boolean isTerminal(State state){     
+        int moveable_white = 0;
+        int moveable_black = 0;
+        int empty_squares = 0;
+        int[] dx = {-1, -1, -1,  0, 0,  1, 1, 1};
+        int[] dy = {-1,  0,  1, -1, 1, -1, 0, 1};
+        for (int x = 0; x < this.width; x++) {
+            for (int y = 0; y < this.height; y++) {
+                if (state.board[x][y] == State.Square.BLACK) {
+                    for (int i = 0; i < 8; i++) {
+                        int neighborX = x + dx[i];
+                        int neighborY = y + dy[i];
 
-        // legal moves for opponent player
-        State.Role opponentRole = (state.role == State.Role.BLACK) ? State.Role.WHITE : State.Role.BLACK;
-        State opponentState = new State(state.board, opponentRole);
-        List<Environment.Move> opponentPlayerMoves = legalMoves(opponentState);
+                        if (isSquareEmpty(neighborX, neighborY, state)) {
+                            moveable_black++;
+                            break;
+                        }
+                    }
+                }
+                else if (state.board[x][y] == State.Square.WHITE) {
+                    for (int i = 0; i < 8; i++) {
+                        int neighborX = x + dx[i];
+                        int neighborY = y + dy[i];
 
-        int emptySquares = 0;
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                if (state.board[x][y] == State.Square.EMPTY)
-                    emptySquares++;
+                        if (isSquareEmpty(neighborX, neighborY, state)) {
+                            moveable_white++;
+                            break;
+                        }
+                    }
+                }
+                else if (state.board[x][y] == State.Square.EMPTY) {
+                    empty_squares++;
+                }
             }
-        }
+        }  
 
         // if either player cannot move
-        if (currentPlayerMoves.isEmpty() && opponentPlayerMoves.isEmpty()){
+        if (moveable_white == 0 || moveable_black == 0){
             return true; // terminate the state 
         }
         // 2) If only W empty squares left → game ends
-        if (emptySquares <= width)
+        if (empty_squares <= width)
             return true;
             
         return false; // not terminate

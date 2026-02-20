@@ -15,6 +15,9 @@ public class SearchAgent implements Agent
 	private long startTime; // Track when move calculation started
 
     private Environment env;
+
+	private int nodesExpanded = 0;
+	private int nodesExpandedThisMove = 0;
 	
 	/*
 		init(String role, int playclock) is called once before you have to select the first action. Use it to initialize the agent. role is either "white" or "black" and playclock is the number of seconds after which nextAction must return.
@@ -28,7 +31,6 @@ public class SearchAgent implements Agent
 		myTurn = !role.equals("white");
 		this.width = width;
 		this.height = height;
-		// TODO: add your own initialization code here
 		// Game always starts with white to move, regardless of which agent this is
         env = new Environment(State.Role.WHITE,width, height, white_positions, black_positions);
     }
@@ -36,8 +38,6 @@ public class SearchAgent implements Agent
 	// lastMove is null the first time nextAction gets called (in the initial state)
     // otherwise it contains the coordinates x1,y1,x2,y2 of the move that the last player did
     public String nextAction(int[] lastMove) {
-		// TODO: time limit
-		// TODO: return "NOOP" if not your players turn
     	if (lastMove != null) {
     		int x1 = lastMove[0], y1 = lastMove[1], x2 = lastMove[2], y2 = lastMove[3];
     		String roleOfLastPlayer;
@@ -47,7 +47,6 @@ public class SearchAgent implements Agent
     			roleOfLastPlayer = "black";
     		}
    			System.out.println(roleOfLastPlayer + " moved from " + x1 + "," + y1 + " to " + x2 + "," + y2);
-    		// TODO: 1. update your internal world model according to the action that was just executed
 			env.doMove(new Environment.Move(x1-1, y1-1, x2-1, y2-1));
     	}
 		
@@ -80,27 +79,36 @@ public class SearchAgent implements Agent
 		Environment.Move bestMove = null;
 		try{
 			while (depth <= (this.width * this.height)) {  // iterative deepening
-				bestMove = minimaxRoot(state_copy, depth, -100, 100);
+				bestMove = minimaxRoot(state_copy, depth, -100, 100, bestMove);
 				depth++;
 			}
 		}
-		catch (Exception e) {}
+		catch (Exception e) {
+		}
+		System.out.print("Nodes expanded this move: " + nodesExpandedThisMove + "\n");
+		System.out.print("Nodes expanded in total: " + nodesExpanded + "\n");
+		nodesExpandedThisMove = 0;
 		return "(play " + (bestMove.fromX + 1) + " " + (bestMove.fromY + 1) + " " + (bestMove.toX + 1) + " " + (bestMove.toY + 1) + ")";
 		} else {
 			return "noop";
 		}
 	}
 
-	public Environment.Move minimaxRoot(State state, int depth, int alpha, int beta) throws Exception {
+	public Environment.Move minimaxRoot(State state, int depth, int alpha, int beta, Environment.Move lastMove) throws Exception {
 		// the search should start in the root - its possible to prune from the root node
-		// if timeIsUp throw Exception() -> don't return anything! Stop the time a few seconds earlier than we need, so we don't run out of time
 		long elapsedTime = (System.currentTimeMillis() - startTime) / 1000; // Convert to seconds
-		if (elapsedTime >= playclock - 2) // Leave 2 second buffer
+		if (elapsedTime >= playclock - 2) // Leave 1 second buffer
 			throw new Exception("Time is up!"); 
 		int best_value = -101;  // Start with worst possible value
 		Environment.Move best_move = null;
 		List<Environment.Move> moves = env.legalMoves(state);
+		if (lastMove != null) {
+			moves.remove(lastMove);
+			moves.add(0, lastMove);
+		}
 		for (Environment.Move m : moves) {
+			nodesExpanded++;
+			nodesExpandedThisMove++;
 			env.doMoveForState(state, m);
 			int value = -minimax(state, depth - 1, -beta, -alpha);
 			//System.out.println("Depth: " + depth + " Move: " + m + " Value: " + value + " Alpha: " + alpha + " Beta: " + beta); // for debugging, take this out later when we have larger spaces 
@@ -123,7 +131,7 @@ public class SearchAgent implements Agent
 
 	public int minimax(State state, int depth, int alpha, int beta) throws Exception {
 		long elapsedTime = (System.currentTimeMillis() - startTime) / 1000; // Convert to seconds
-		if (elapsedTime >= playclock - 2) // Leave 2 second buffer
+		if (elapsedTime >= playclock - 2) // Leave 1 second buffer
 			throw new Exception("Time is up!"); // for time limit, catch this in the minimaxRoot and return the best move found so far
 		if (env.isTerminal(state) || depth <= 0){ //depth limit == 0, reached end of depth
 			return env.evaluationFunction(state);
@@ -132,6 +140,8 @@ public class SearchAgent implements Agent
 			int best_value = -101;
 			List<Environment.Move> moves = env.legalMoves(state);
 			for (Environment.Move m : moves) {
+				nodesExpanded++;
+				nodesExpandedThisMove++;
 				env.doMoveForState(state, m);
 				int value = -minimax(state, depth - 1, -beta, -alpha);
 				//System.out.println("Depth: " + depth + " Move: " + m + " Value: " + value + " Alpha: " + alpha + " Beta: " + beta); // for debugging, take this out later when we have larger spaces 
@@ -154,22 +164,10 @@ public class SearchAgent implements Agent
 	}
 
 
-	// TODO: Add pruning and changable depth + timestamp stuff
-	// for now try implementing this without pruning and without iterative depth - to test
-	// if search is suspiciously fast - check if pruning is right, draw it out on paper and compare
-	// try to minimize running the legal_moves function, since that takes the longest time
-
-
-
-	// ##########################################################3
-
-	// is called when the game is over or the match is aborted
 	@Override
 	public void cleanup() {
-		// TODO: cleanup so that the agent is ready for the next match
-		// garbage collector in java - check it out
-		// env = null; - clear environment
-		// table.clear(); when we have transposition tables
+		nodesExpanded = 0;
+		nodesExpandedThisMove = 0;
 	}
 
 }
