@@ -5,7 +5,6 @@ public class Environment {
 
     public static class Move {
         // action -> move a queen fromX, fromY, toX, toY
-        // FIXME: could do it int is x_1 + (y_1 << 8) + (x_2 << 16) + (y_2 << 24) instead, faster
         int fromX, fromY;
         int toX, toY;
         public Move(int fromX, int fromY, int toX, int toY) {
@@ -13,6 +12,19 @@ public class Environment {
             this.fromY = fromY;
             this.toX = toX;
             this.toY = toY;
+        }
+    }
+    public static class StateAnalysis {
+        public List<Move> legalMoves;
+        public int whiteMobility;
+        public int blackMobility;
+        public boolean isTerminal;
+        public int evaluation;
+        
+        public StateAnalysis(List<Move> moves, int whiteMob, int blackMob) {
+            this.legalMoves = moves;
+            this.whiteMobility = whiteMob;
+            this.blackMobility = blackMob;
         }
     }
 
@@ -36,130 +48,6 @@ public class Environment {
             board[pos[0]-1][pos[1]-1] = State.Square.BLACK;
         }
         current_state = new State(board, role);
-    }
-
-    public List<Move> legalMoves(State state) {
-        // returns a list of possible actions
-        // TODO: Returns 0 based x and y values now, fix to return +1s on both x and y
-        State.Square color;
-        if (state.role == State.Role.WHITE) {
-            color = State.Square.WHITE;
-        }
-        else {
-            color = State.Square.BLACK;
-        }
-        
-		List<Move> moves = new LinkedList<>();
-        for (int x = 0; x < this.width; x++) {
-            for (int y = 0; y < this.height; y++) {
-                if (state.board[x][y] == color) {
-                    int xd = x;
-                    int yd = y;
-                    //Check North
-                    for (int i = yd+1; i < this.height; i++) {
-                        if (state.board[x][i] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, x, i));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
-                    //Check NE
-                    xd++;
-                    yd++;
-                    while (yd < this.height && xd < this.width) {
-                        if (state.board[xd][yd] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, xd, yd));
-                        }
-                        else {
-                            break;
-                        }
-                        xd++;
-                        yd++;
-                    }
-                    xd = x;
-                    yd = y;
-
-                    //Check East
-                    for (int i = xd+1; i < this.width; i++) {
-                        if (state.board[i][y] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, i, y));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
-                    //Check SE
-                    xd++;
-                    yd--;
-                    while (yd >= 0 && xd < this.width) {
-                        if (state.board[xd][yd] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, xd, yd));
-                        }
-                        else {
-                            break;
-                        }
-                        xd++;
-                        yd--;
-                    }
-                    xd = x;
-                    yd = y;
-                    
-                    //Check South
-                    for (int i = yd-1; i >= 0; i--) {
-                        if (state.board[x][i] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, x, i));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
-                    //Check SW
-                    xd--;
-                    yd--;
-                    while (yd >= 0 && xd >= 0) {
-                        if (state.board[xd][yd] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, xd, yd));
-                        }
-                        else {
-                            break;
-                        }
-                        xd--;
-                        yd--;
-                    }
-                    xd = x;
-                    yd = y;
-
-                    //Check West
-                    for (int i = xd-1; i >= 0; i--) {
-                        if (state.board[i][y] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, i, y));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
-                    // Check NW
-                    xd--;
-                    yd++;
-                    while (yd < this.height && xd >= 0) {
-                        if (state.board[xd][yd] == State.Square.EMPTY) {
-                            moves.add(new Move(x, y, xd, yd));
-                        }
-                        else {
-                            break;
-                        }
-                        xd--;
-                        yd++;
-                    }
-                }
-            }
-        }
-        return moves;
     }
 
     public void doMove(Move m) {
@@ -220,124 +108,266 @@ public class Environment {
         return new State(copy, role);
     }
 
-    private boolean isSquareEmpty(int x, int y, State state) {
-        if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
-            return false; 
-        }
-        return state.board[x][y] == State.Square.EMPTY;
-    }
-
-    public int evaluationFunction (State state) {
-        int moveable_white = 0;
-        int moveable_black = 0;
+    // Does a single pass through the board to complete legalmoves, terminal check and evaluation all at once, to save time in the search
+    public StateAnalysis analyzeState(State state) {
+        List<Move> moves = new LinkedList<>();
+        int white_mobility = 0;
+        int black_mobility = 0;
         int empty_squares = 0;
-        int[] dx = {-1, -1, -1,  0, 0,  1, 1, 1};
-        int[] dy = {-1,  0,  1, -1, 1, -1, 0, 1};
+        
+        State.Square currentColor = (state.role == State.Role.WHITE) ? State.Square.WHITE : State.Square.BLACK;
+        
         for (int x = 0; x < this.width; x++) {
             for (int y = 0; y < this.height; y++) {
                 if (state.board[x][y] == State.Square.BLACK) {
-                    for (int i = 0; i < 8; i++) {
-                        int neighborX = x + dx[i];
-                        int neighborY = y + dy[i];
+                    int xd = x;
+                    int yd = y;
+                    
+                    //Check North
+                    for (int i = yd+1; i < this.height; i++) {
+                        if (state.board[x][i] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, x, i));
+                            }
+                        } else break;
+                    }
 
-                        if (isSquareEmpty(neighborX, neighborY, state)) {
-                            moveable_black++;
-                            break;
-                        }
+                    //Check NE
+                    xd++;
+                    yd++;
+                    while (yd < this.height && xd < this.width) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd++;
+                        yd++;
+                    }
+                    xd = x;
+                    yd = y;
+
+                    //Check East
+                    for (int i = xd+1; i < this.width; i++) {
+                        if (state.board[i][y] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, i, y));
+                            }
+                        } else break;
+                    }
+
+                    //Check SE
+                    xd++;
+                    yd--;
+                    while (yd >= 0 && xd < this.width) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd++;
+                        yd--;
+                    }
+                    xd = x;
+                    yd = y;
+                    
+                    //Check South
+                    for (int i = yd-1; i >= 0; i--) {
+                        if (state.board[x][i] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, x, i));
+                            }
+                        } else break;
+                    }
+
+                    //Check SW
+                    xd--;
+                    yd--;
+                    while (yd >= 0 && xd >= 0) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd--;
+                        yd--;
+                    }
+                    xd = x;
+                    yd = y;
+
+                    //Check West
+                    for (int i = xd-1; i >= 0; i--) {
+                        if (state.board[i][y] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, i, y));
+                            }
+                        } else break;
+                    }
+
+                    //Check NW
+                    xd--;
+                    yd++;
+                    while (yd < this.height && xd >= 0) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            black_mobility++;
+                            if (currentColor == State.Square.BLACK) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd--;
+                        yd++;
                     }
                 }
                 else if (state.board[x][y] == State.Square.WHITE) {
-                    for (int i = 0; i < 8; i++) {
-                        int neighborX = x + dx[i];
-                        int neighborY = y + dy[i];
+                    // Count all moves for white pieces
+                    int xd = x;
+                    int yd = y;
+                    
+                    //Check North
+                    for (int i = yd+1; i < this.height; i++) {
+                        if (state.board[x][i] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, x, i));
+                            }
+                        } else break;
+                    }
 
-                        if (isSquareEmpty(neighborX, neighborY, state)) {
-                            moveable_white++;
-                            break;
-                        }
+                    //Check NE
+                    xd++;
+                    yd++;
+                    while (yd < this.height && xd < this.width) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd++;
+                        yd++;
+                    }
+                    xd = x;
+                    yd = y;
+
+                    //Check East
+                    for (int i = xd+1; i < this.width; i++) {
+                        if (state.board[i][y] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, i, y));
+                            }
+                        } else break;
+                    }
+
+                    //Check SE
+                    xd++;
+                    yd--;
+                    while (yd >= 0 && xd < this.width) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd++;
+                        yd--;
+                    }
+                    xd = x;
+                    yd = y;
+                    
+                    //Check South
+                    for (int i = yd-1; i >= 0; i--) {
+                        if (state.board[x][i] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, x, i));
+                            }
+                        } else break;
+                    }
+
+                    //Check SW
+                    xd--;
+                    yd--;
+                    while (yd >= 0 && xd >= 0) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd--;
+                        yd--;
+                    }
+                    xd = x;
+                    yd = y;
+
+                    //Check West
+                    for (int i = xd-1; i >= 0; i--) {
+                        if (state.board[i][y] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, i, y));
+                            }
+                        } else break;
+                    }
+
+                    //Check NW
+                    xd--;
+                    yd++;
+                    while (yd < this.height && xd >= 0) {
+                        if (state.board[xd][yd] == State.Square.EMPTY) {
+                            white_mobility++;
+                            if (currentColor == State.Square.WHITE) {
+                                moves.add(new Move(x, y, xd, yd));
+                            }
+                        } else break;
+                        xd--;
+                        yd++;
                     }
                 }
                 else if (state.board[x][y] == State.Square.EMPTY) {
                     empty_squares++;
                 }
             }
-        }
-        // Return value from current player's perspective: positive = good for current player, negative = bad
-        // Current player to move is state.role
-        if (state.role == State.Role.BLACK) {
-            // It's BLACK's turn
-            if (moveable_black == 0 && moveable_white > 0) {
-                return -100;
-            }
-            else if (moveable_white == 0 && moveable_black > 0) {
-                return 100;
-            }
-            else if (moveable_black == 0 && moveable_white == 0) {
-                return 0;
-            }
-            return moveable_black - moveable_white;
-        }
-        else {
-            // It's WHITE's turn
-            if (moveable_white == 0 && moveable_black > 0) {
-                return -100;
-            }
-            else if (moveable_black == 0 && moveable_white > 0) {
-                return 100;
-            }
-            else if (moveable_black == 0 && moveable_white == 0) {
-                return 0;
-            }
-            return moveable_white - moveable_black;
         }
         
-    }
-
-    public boolean isTerminal(State state){     
-        int moveable_white = 0;
-        int moveable_black = 0;
-        int empty_squares = 0;
-        int[] dx = {-1, -1, -1,  0, 0,  1, 1, 1};
-        int[] dy = {-1,  0,  1, -1, 1, -1, 0, 1};
-        for (int x = 0; x < this.width; x++) {
-            for (int y = 0; y < this.height; y++) {
-                if (state.board[x][y] == State.Square.BLACK) {
-                    for (int i = 0; i < 8; i++) {
-                        int neighborX = x + dx[i];
-                        int neighborY = y + dy[i];
-
-                        if (isSquareEmpty(neighborX, neighborY, state)) {
-                            moveable_black++;
-                            break;
-                        }
-                    }
-                }
-                else if (state.board[x][y] == State.Square.WHITE) {
-                    for (int i = 0; i < 8; i++) {
-                        int neighborX = x + dx[i];
-                        int neighborY = y + dy[i];
-
-                        if (isSquareEmpty(neighborX, neighborY, state)) {
-                            moveable_white++;
-                            break;
-                        }
-                    }
-                }
-                else if (state.board[x][y] == State.Square.EMPTY) {
-                    empty_squares++;
-                }
+        StateAnalysis analysis = new StateAnalysis(moves, white_mobility, black_mobility);
+        
+        // Terminal check
+        analysis.isTerminal = (white_mobility == 0 || black_mobility == 0 || empty_squares <= this.width);
+        
+        // Compute evaluation from current player's perspective
+        if (state.role == State.Role.BLACK) {
+            if (black_mobility == 0 && white_mobility > 0) {
+                analysis.evaluation = -100;
+            } else if (white_mobility == 0 && black_mobility > 0) {
+                analysis.evaluation = 100;
+            } else if (black_mobility == 0 && white_mobility == 0) {
+                analysis.evaluation = 0;
+            } else {
+                analysis.evaluation = black_mobility - white_mobility;
             }
-        }  
-
-        // if either player cannot move
-        if (moveable_white == 0 || moveable_black == 0){
-            return true; // terminate the state 
+        } else {
+            if (white_mobility == 0 && black_mobility > 0) {
+                analysis.evaluation = -100;
+            } else if (black_mobility == 0 && white_mobility > 0) {
+                analysis.evaluation = 100;
+            } else if (white_mobility == 0 && black_mobility == 0) {
+                analysis.evaluation = 0;
+            } else {
+                analysis.evaluation = white_mobility - black_mobility;
+            }
         }
-        // 2) If only W empty squares left → game ends
-        if (empty_squares <= width)
-            return true;
-            
-        return false; // not terminate
+        
+        return analysis;
     }
 
 }
+
