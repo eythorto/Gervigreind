@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from scipy.stats import multivariate_normal
 
 # Data preparation (Task 6.1)
 # NB:
@@ -193,7 +194,22 @@ for data in train_data:
 print(instances_dict)
 
 
+# Convert initial_dict to probability vector
+N = len(phoneme_set)  # Number of states
+initial_prob = np.zeros(N)
 
+total_initial = sum(initial_dict.values())
+for phoneme_idx, count in initial_dict.items():
+    initial_prob[phoneme_idx] = count / total_initial
+
+transition_prob = np.zeros((N, N))
+
+for current_state, next_states in transition_dict.items():
+    total_transitions = instances_dict[current_state]
+    for next_state, count in next_states.items():
+        transition_prob[current_state, next_state] = count / total_transitions
+transition_prob += 1e-10
+transition_prob = transition_prob / transition_prob.sum(axis=1, keepdims=True)
 
 # emission parameters
 # calculate the mean vector (avg of all feature vectors)
@@ -227,48 +243,40 @@ for phoneme_idx in range(len(phoneme_set)):
         }
 
 
-        
-# import matplotlib.pyplot as plt
+# Forward Algorithm (Filtering)
+def forward_algorithm(observations, initial_prob, transition_prob, emission_params):
+    """
+    Filtering: compute P(X_t | o_1:t) at each time step
+    """
+    T, D = observations.shape
+    N = len(initial_prob)
+    
+    log_alpha = np.zeros((T, N))
+    
+    # t=0: α_0(i) = P(X_0=i) * P(o_0|X_0=i)
+    for i in range(N):
+        log_alpha[0, i] = np.log(initial_prob[i] + 1e-10) + \
+            multivariate_normal.logpdf(observations[0], emission_params[i]['mean'], emission_params[i]['cov'])
+    
+    # t=1..T-1: α_t(j) = P(o_t|X_t=j) * Σ_i[α_{t-1}(i) * P(j|i)]
+    for t in range(1, T):
+        for j in range(N):
+            log_emission = multivariate_normal.logpdf(observations[t], emission_params[j]['mean'], emission_params[j]['cov'])
+            log_trans = log_alpha[t-1] + np.log(transition_prob[:, j] + 1e-10)
+            log_alpha[t, j] = log_emission + np.logaddexp.reduce(log_trans)
+    
+    # Convert to normalized beliefs
+    beliefs = np.exp(log_alpha - log_alpha.max(axis=1, keepdims=True))
+    beliefs /= beliefs.sum(axis=1, keepdims=True)
+    
+    return beliefs
 
-# # Visualize Gaussian distribution for a single phoneme (e.g., "pau")
-# phoneme_idx = 0  # "pau"
-# phoneme_name = idx_to_phoneme[phoneme_idx]
 
-# # Get mean and covariance for this phoneme
-# mean = emission_parameters[phoneme_idx]['mean']
-# cov = emission_parameters[phoneme_idx]['cov']
+# Test on first test sample
+test_features, test_labels = test_data[0]
+beliefs = forward_algorithm(test_features, initial_prob, transition_prob, emission_parameters)
 
-# # Visualize using first 2 feature dimensions for simplicity
-# mean_2d = mean[:2]
-# cov_2d = cov[:2, :2]
+predicted = np.argmax(beliefs, axis=1)
+accuracy = np.mean(predicted == test_labels)
+print(f"\nFiltering accuracy: {accuracy*100:.2f}%")
 
-# # Create a grid for plotting
-# x = np.linspace(mean_2d[0] - 3*np.sqrt(cov_2d[0,0]), mean_2d[0] + 3*np.sqrt(cov_2d[0,0]), 100)
-# y = np.linspace(mean_2d[1] - 3*np.sqrt(cov_2d[1,1]), mean_2d[1] + 3*np.sqrt(cov_2d[1,1]), 100)
-# X, Y = np.meshgrid(x, y)
-
-# # Manual computation of multivariate Gaussian PDF
-# inv_cov = np.linalg.inv(cov_2d)
-# det_cov = np.linalg.det(cov_2d)
-
-# Z = np.zeros_like(X)
-# for i in range(X.shape[0]):
-#     for j in range(X.shape[1]):
-#         x_vec = np.array([X[i,j], Y[i,j]]) - mean_2d
-#         Z[i,j] = np.exp(-0.5 * x_vec @ inv_cov @ x_vec) / (2 * np.pi * np.sqrt(det_cov))
-
-# # Plot
-# fig, ax = plt.subplots(figsize=(10, 8))
-# contour = ax.contourf(X, Y, Z, levels=20, cmap='viridis')
-# ax.plot(mean_2d[0], mean_2d[1], 'r*', markersize=15, label='Mean')
-# ax.set_xlabel('Feature Dimension 0')
-# ax.set_ylabel('Feature Dimension 1')
-# ax.set_title(f'2D Gaussian Distribution for Phoneme "{phoneme_name}"')
-# plt.colorbar(contour, ax=ax, label='Probability Density')
-# ax.legend()
-# plt.tight_layout()
-# plt.savefig(f'gaussian_distribution_{phoneme_name}.png', dpi=150)
-# plt.show()
-
-# print(f"Mean vector (first 2 dims): {mean_2d}")
-# print(f"Covariance matrix (2x2): \n{cov_2d}")
